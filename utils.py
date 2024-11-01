@@ -14,6 +14,17 @@ def is_valid_twitter_url(url: str) -> bool:
     except:
         return False
 
+def is_thread_url(url: str) -> bool:
+    """
+    Check if the URL is a Twitter/X thread URL
+    """
+    try:
+        parsed = urlparse(url)
+        path_parts = parsed.path.split('/')
+        return 'status' in path_parts and len(path_parts) > 3
+    except:
+        return False
+
 def generate_temp_filename() -> str:
     """
     Generate a unique temporary filename
@@ -36,3 +47,13 @@ def ensure_temp_dir_exists():
     """
     if not os.path.exists(TEMP_DIR):
         os.makedirs(TEMP_DIR)
+
+def extract_video_urls_from_thread(thread_url: str) -> list:
+    """
+    Extract all video URLs from a Twitter/X thread
+    Returns a list of video URLs
+    """
+    # For now, we'll treat the thread URL itself as a video URL
+    # In a real implementation, we would need to use Twitter's API
+    # or web scraping to get all video URLs from the thread
+    return [thread_url]

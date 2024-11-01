@@ -3,7 +3,10 @@ import yt_dlp
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from config import BOT_TOKEN, WELCOME_MESSAGE, HELP_MESSAGE
-from utils import is_valid_twitter_url, generate_temp_filename, cleanup_temp_file, ensure_temp_dir_exists
+from utils import (
+    is_valid_twitter_url, generate_temp_filename, cleanup_temp_file, 
+    ensure_temp_dir_exists, is_thread_url, extract_video_urls_from_thread
+)
 
 # Configure logging
 logging.basicConfig(
@@ -41,6 +44,47 @@ async def download_video(url: str) -> str:
         logger.error(f"Error downloading video: {str(e)}")
         raise
 
+async def handle_thread(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
+    """Handle Twitter/X thread URLs"""
+    status_message = await update.message.reply_text(
+        "⏳ Processing thread... This might take a while."
+    )
+    
+    try:
+        # Get all video URLs from the thread
+        video_urls = extract_video_urls_from_thread(url)
+        
+        if not video_urls:
+            await update.message.reply_text("❌ No videos found in this thread.")
+            return
+        
+        await status_message.edit_text(f"📥 Found {len(video_urls)} videos. Downloading...")
+        
+        # Download each video
+        for i, video_url in enumerate(video_urls, 1):
+            try:
+                video_path = await download_video(video_url)
+                await update.message.reply_video(
+                    video=open(video_path, 'rb'),
+                    caption=f"✅ Video {i}/{len(video_urls)} from thread"
+                )
+                cleanup_temp_file(video_path)
+            except Exception as e:
+                await update.message.reply_text(
+                    f"❌ Failed to download video {i}/{len(video_urls)}. Error: {str(e)}"
+                )
+                
+        await update.message.reply_text("✅ Thread processing completed!")
+        
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ Sorry, I couldn't process this thread. Error: {str(e)}"
+        )
+        logger.error(f"Error processing thread {url}: {str(e)}")
+    
+    finally:
+        await status_message.delete()
+
 async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming Twitter/X URLs"""
     url = update.message.text.strip()
@@ -51,6 +95,12 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
+    # Check if it's a thread URL
+    if is_thread_url(url):
+        await handle_thread(update, context, url)
+        return
+    
+    # Handle single video
     status_message = await update.message.reply_text(
         "⏳ Downloading video... Please wait."
     )
