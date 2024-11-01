@@ -1,0 +1,9 @@
+[project]
+name = "repl-nix-twittervideodownloaderbot"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "python-telegram-bot>=21.6",
+    "yt-dlp>=2024.10.22",
+]
