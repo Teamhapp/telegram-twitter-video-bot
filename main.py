@@ -2,7 +2,10 @@ import logging
 import yt_dlp
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from config import BOT_TOKEN, WELCOME_MESSAGE, HELP_MESSAGE
+from config import (
+    BOT_TOKEN, WELCOME_MESSAGE, HELP_MESSAGE, 
+    VIDEO_QUALITIES, DEFAULT_QUALITY
+)
 from utils import (
     is_valid_twitter_url, generate_temp_filename, cleanup_temp_file, 
     ensure_temp_dir_exists, is_thread_url, extract_video_urls_from_thread
@@ -23,17 +26,52 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /help command"""
     await update.message.reply_text(HELP_MESSAGE, parse_mode='Markdown')
 
-async def download_video(url: str) -> str:
+async def quality_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show current quality setting"""
+    quality = context.user_data.get('quality', DEFAULT_QUALITY)
+    message = f"Current video quality: *{quality}* ({VIDEO_QUALITIES[quality]})"
+    await update.message.reply_text(message, parse_mode='Markdown')
+
+async def set_quality(update: Update, context: ContextTypes.DEFAULT_TYPE, quality: str):
+    """Set video quality preference"""
+    if quality not in VIDEO_QUALITIES:
+        await update.message.reply_text("❌ Invalid quality setting.")
+        return
+    
+    context.user_data['quality'] = quality
+    message = f"✅ Video quality set to: *{quality}* ({VIDEO_QUALITIES[quality]})"
+    await update.message.reply_text(message, parse_mode='Markdown')
+
+async def quality_best_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await set_quality(update, context, 'best')
+
+async def quality_medium_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await set_quality(update, context, 'medium')
+
+async def quality_low_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await set_quality(update, context, 'low')
+
+def get_format_options(quality: str) -> dict:
+    """Get yt-dlp format options based on quality setting"""
+    formats = {
+        'best': 'best',
+        'medium': 'best[height<=480]',
+        'low': 'best[height<=240]'
+    }
+    return {'format': formats.get(quality, 'best')}
+
+async def download_video(url: str, quality: str = DEFAULT_QUALITY) -> str:
     """
     Download video from Twitter/X URL
     Returns the path to the downloaded file
     """
     output_file = generate_temp_filename()
     
+    format_opts = get_format_options(quality)
     ydl_opts = {
-        'format': 'best',
         'outtmpl': output_file,
-        'quiet': True
+        'quiet': True,
+        **format_opts
     }
     
     try:
@@ -46,8 +84,9 @@ async def download_video(url: str) -> str:
 
 async def handle_thread(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
     """Handle Twitter/X thread URLs"""
+    quality = context.user_data.get('quality', DEFAULT_QUALITY)
     status_message = await update.message.reply_text(
-        "⏳ Processing thread... This might take a while."
+        f"⏳ Processing thread... This might take a while. Using {quality} quality."
     )
     
     try:
@@ -63,7 +102,7 @@ async def handle_thread(update: Update, context: ContextTypes.DEFAULT_TYPE, url:
         # Download each video
         for i, video_url in enumerate(video_urls, 1):
             try:
-                video_path = await download_video(video_url)
+                video_path = await download_video(video_url, quality)
                 await update.message.reply_video(
                     video=open(video_path, 'rb'),
                     caption=f"✅ Video {i}/{len(video_urls)} from thread"
@@ -88,6 +127,7 @@ async def handle_thread(update: Update, context: ContextTypes.DEFAULT_TYPE, url:
 async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming Twitter/X URLs"""
     url = update.message.text.strip()
+    quality = context.user_data.get('quality', DEFAULT_QUALITY)
     
     if not is_valid_twitter_url(url):
         await update.message.reply_text(
@@ -102,17 +142,17 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Handle single video
     status_message = await update.message.reply_text(
-        "⏳ Downloading video... Please wait."
+        f"⏳ Downloading video in {quality} quality... Please wait."
     )
     
     try:
         # Download the video
-        video_path = await download_video(url)
+        video_path = await download_video(url, quality)
         
         # Send the video
         await update.message.reply_video(
             video=open(video_path, 'rb'),
-            caption="✅ Here's your video!"
+            caption=f"✅ Here's your video in {quality} quality!"
         )
         
     except Exception as e:
@@ -138,6 +178,10 @@ def main():
     # Add handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("quality", quality_command))
+    application.add_handler(CommandHandler("quality_best", quality_best_command))
+    application.add_handler(CommandHandler("quality_medium", quality_medium_command))
+    application.add_handler(CommandHandler("quality_low", quality_low_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
     
     # Start the bot

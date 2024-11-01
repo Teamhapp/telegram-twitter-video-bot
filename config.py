@@ -4,6 +4,16 @@ import os
 # Get bot token from environment variables
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 
+# Video quality options
+VIDEO_QUALITIES = {
+    'best': 'Best available quality',
+    'medium': 'Medium quality (480p if available)',
+    'low': 'Low quality (240p if available)'
+}
+
+# Default quality
+DEFAULT_QUALITY = 'best'
+
 # Messages
 WELCOME_MESSAGE = """
 Welcome to Twitter/X Video Downloader Bot! 🎥
@@ -19,6 +29,12 @@ HELP_MESSAGE = """
 3. Send the URL to this bot
 4. Wait for the bot to process and send your video(s)
 
+*Video Quality Options:*
+Use these commands to set your preferred video quality:
+/quality_best - Best available quality (default)
+/quality_medium - Medium quality (480p if available)
+/quality_low - Low quality (240p if available)
+
 *Supported URLs:*
 • Single video URLs
 • Thread URLs (downloads all videos in the thread)
@@ -26,6 +42,7 @@ HELP_MESSAGE = """
 *Supported Commands:*
 /start - Start the bot
 /help - Show this help message
+/quality - Show current quality setting
 
 *Note:* Only Twitter/X video URLs are supported.
 """
