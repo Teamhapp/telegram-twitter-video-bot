@@ -8,7 +8,8 @@ from config import (
 )
 from utils import (
     is_valid_twitter_url, generate_temp_filename, cleanup_temp_file, 
-    ensure_temp_dir_exists, is_thread_url, extract_video_urls_from_thread
+    ensure_temp_dir_exists, is_thread_url, extract_video_urls_from_thread,
+    check_subscription
 )
 
 # Configure logging
@@ -18,20 +19,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@check_subscription
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /start command"""
     await update.message.reply_text(WELCOME_MESSAGE)
 
+@check_subscription
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /help command"""
     await update.message.reply_text(HELP_MESSAGE, parse_mode='Markdown')
 
+@check_subscription
 async def quality_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show current quality setting"""
     quality = context.user_data.get('quality', DEFAULT_QUALITY)
     message = f"Current video quality: *{quality}* ({VIDEO_QUALITIES[quality]})"
     await update.message.reply_text(message, parse_mode='Markdown')
 
+@check_subscription
 async def set_quality(update: Update, context: ContextTypes.DEFAULT_TYPE, quality: str):
     """Set video quality preference"""
     if quality not in VIDEO_QUALITIES:
@@ -82,6 +87,7 @@ async def download_video(url: str, quality: str = DEFAULT_QUALITY) -> str:
         logger.error(f"Error downloading video: {str(e)}")
         raise
 
+@check_subscription
 async def handle_thread(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
     """Handle Twitter/X thread URLs"""
     quality = context.user_data.get('quality', DEFAULT_QUALITY)
@@ -124,6 +130,7 @@ async def handle_thread(update: Update, context: ContextTypes.DEFAULT_TYPE, url:
     finally:
         await status_message.delete()
 
+@check_subscription
 async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming Twitter/X URLs"""
     url = update.message.text.strip()
